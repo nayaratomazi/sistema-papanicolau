@@ -9,7 +9,16 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+st.markdown(""
+            <style>
+            #MainMenu {visibility: hidden;}
+            footer {visibibility: hidden;}
+            header {visibility: hidden;}
+            [data-testid="stToolbar"] {visibility: hidden;}
+            </stile>
+            """, unsafe_allow_html=True)
 
+            
 # 2. LOGO E CABEÇALHO
 col_logo, col_titulo = st.columns([1, 5])
 
