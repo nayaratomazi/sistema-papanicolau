@@ -9,14 +9,15 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-st.markdown(""
-            <style>
-            #MainMenu {visibility: hidden;}
-            footer {visibibility: hidden;}
-            header {visibility: hidden;}
-            [data-testid="stToolbar"] {visibility: hidden;}
-            </stile>
-            """, unsafe_allow_html=True)
+# --- LIMPEZA DA INTERFACE ---
+st.markdown("""
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    [data-testid="stToolbar"] {visibility: hidden;}
+    </style>
+    """, unsafe_allow_html=True)
 
             
 # 2. LOGO E CABEÇALHO
@@ -284,3 +285,4 @@ if acesso == senha_correta:
                 "relatorio_filtrado.csv",
                 "text/csv"
             )
+
