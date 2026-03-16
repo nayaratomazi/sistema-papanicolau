@@ -131,13 +131,35 @@ else:
                 st.markdown("---")
                 c_g1, c_g2 = st.columns(2)
                 with c_g1:
-                    st.write("### Microbiologia")
-                    fig, ax = plt.subplots()
-                    df_f["Microbiologia"].value_counts().plot.pie(autopct='%1.1f%%', ax=ax)
-                    st.pyplot(fig)
+                st.write("### Microbiologia")
+            
+                contagem_micro = df_f["Microbiologia"].value_counts().sort_values()
+            
+                fig, ax = plt.subplots(figsize=(6,4))
+                contagem_micro.plot.barh(ax=ax)
+            
+                ax.set_xlabel("Quantidade")
+                ax.set_ylabel("Tipo")
+                ax.set_title("Distribuição da Microbiologia")
+            
+                for i, v in enumerate(contagem_micro):
+                    ax.text(v + 0.1, i, str(v), va='center')
+            
+                st.pyplot(fig)
                 with c_g2:
                     st.write("### Epitélios")
-                    st.bar_chart(df_f["Epitélios"].value_counts())
+                    contagem_epi = df_f["Epitélios"].value_counts().sort_values()
+
+                    fig2, ax2 = plt.subplots(figsize=(6,4))
+                    contagem_epi.plot.barh(ax=ax2)
+                    
+                    ax2.set_xlabel("Quantidade")
+                    ax2.set_title("Epitélios Representados")
+                    
+                    for i, v in enumerate(contagem_epi):
+                        ax2.text(v + 0.1, i, str(v), va='center')
+                    
+                    st.pyplot(fig2)
 
             with aba2:
                 st.dataframe(df_f.style.apply(lambda x: ['background-color: #ffcccc' if x.Alterado else '' for _ in x], axis=1))
