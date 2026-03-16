@@ -170,10 +170,30 @@ if acesso == senha_correta:
 
         termos_alerta = ["ASC-US", "ASC-H", "BAIXO GRAU", "ALTO GRAU", "REPETIR", "LESÃO", "ATIPIAS", "CARCINOMA"]
 
-        tabela["Alterado"] = tabela["Resultado"].str.upper().apply(
-            lambda x: any(t in str(x) for t in termos_alerta)
-        )
+       # --- INÍCIO DA CORREÇÃO ---
+# Verificamos se a tabela foi lida corretamente
+if not tabela.empty:
+    colunas_disponiveis = [str(c).upper().strip() for c in tabela.columns]
+    coluna_alvo = None
 
+    # Lista de possíveis nomes que o laboratório pode usar para o resultado
+    possiveis_nomes = ["RESULTADO", "DIAGNÓSTICO", "DESCRICAO", "CONCLUSÃO", "EXAME"]
+
+    for col in tabela.columns:
+        if any(nome in str(col).upper() for nome in possiveis_nomes):
+            coluna_alvo = col
+            break
+
+    # Se encontrar a coluna, processa os dados. Se não, cria uma coluna de aviso.
+    if coluna_alvo:
+        tabela["Alterado"] = tabela[coluna_alvo].astype(str).str.upper().apply(
+            lambda x: "SIM" if any(term in x for term in ["NIC", "ASCUS", "AGUS", "LESÃO", "MALIGNO", "CARCINOMA"]) else "NÃO"
+        )
+    else:
+        tabela["Alterado"] = "NOME DA COLUNA NÃO ENCONTRADO"
+        st.warning("Atenção: Não encontramos a coluna 'Resultado' no PDF. Verifique o layout do arquivo.")
+
+# --- FIM DA CORREÇÃO ---
         def destacar_alterados(linha):
             cor = "background-color: #ffffb3; color: black" if linha["Alterado"] else ""
             return [cor for _ in linha]
