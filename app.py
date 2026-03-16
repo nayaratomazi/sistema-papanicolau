@@ -144,8 +144,8 @@ else:
                 
                     for i, v in enumerate(contagem_micro):
                         ax.text(v + 0.1, i, str(v), va='center')
-            
-                st.pyplot(fig)
+                
+                    st.pyplot(fig)
                 with c_g2:
                     st.write("### Epitélios")
                     contagem_epi = df_f["Epitélios"].value_counts().sort_values()
