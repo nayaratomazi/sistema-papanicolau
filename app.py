@@ -1,6 +1,7 @@
 import streamlit as st
 import pdfplumber
 import pandas as pd
+import matplotlib.pyplot as plt # ADICIONADO: Necessário para o gráfico de pizza
 
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(
@@ -9,6 +10,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
 # --- LIMPEZA DA INTERFACE ---
 st.markdown("""
     <style>
@@ -19,7 +21,6 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-            
 # 2. LOGO E CABEÇALHO
 col_logo, col_titulo = st.columns([1, 5])
 
@@ -55,7 +56,6 @@ if acesso == senha_correta:
                         continue
 
                     if "Idade:" in texto:
-
                         idade = texto.split("Idade:")[1].split()[0]
 
                         coleta = (
@@ -170,139 +170,139 @@ if acesso == senha_correta:
 
         termos_alerta = ["ASC-US", "ASC-H", "BAIXO GRAU", "ALTO GRAU", "REPETIR", "LESÃO", "ATIPIAS", "CARCINOMA"]
 
-       # --- INÍCIO DA CORREÇÃO ---
-# Verificamos se a tabela foi lida corretamente
-if not tabela.empty:
-    colunas_disponiveis = [str(c).upper().strip() for c in tabela.columns]
-    coluna_alvo = None
+        # --- INÍCIO DA CORREÇÃO ---
+        if not tabela.empty:
+            coluna_alvo = None
+            possiveis_nomes = ["RESULTADO", "DIAGNÓSTICO", "DESCRICAO", "CONCLUSÃO", "EXAME"]
 
-    # Lista de possíveis nomes que o laboratório pode usar para o resultado
-    possiveis_nomes = ["RESULTADO", "DIAGNÓSTICO", "DESCRICAO", "CONCLUSÃO", "EXAME"]
+            for col in tabela.columns:
+                if any(nome in str(col).upper() for nome in possiveis_nomes):
+                    coluna_alvo = col
+                    break
 
-    for col in tabela.columns:
-        if any(nome in str(col).upper() for nome in possiveis_nomes):
-            coluna_alvo = col
-            break
+            # CORREÇÃO: Usar True/False em vez de "SIM"/"NÃO" para permitir a soma (.sum()) e os filtros depois
+            if coluna_alvo:
+                tabela["Alterado"] = tabela[coluna_alvo].astype(str).str.upper().apply(
+                    lambda x: True if any(term in x for term in ["NIC", "ASCUS", "AGUS", "LESÃO", "MALIGNO", "CARCINOMA"]) else False
+                )
+            else:
+                tabela["Alterado"] = False # Default seguro se não encontrar
+                st.warning("Atenção: Não encontramos a coluna 'Resultado' no PDF. Verifique o layout do arquivo.")
+        # --- FIM DA CORREÇÃO ---
 
-    # Se encontrar a coluna, processa os dados. Se não, cria uma coluna de aviso.
-    if coluna_alvo:
-        tabela["Alterado"] = tabela[coluna_alvo].astype(str).str.upper().apply(
-            lambda x: "SIM" if any(term in x for term in ["NIC", "ASCUS", "AGUS", "LESÃO", "MALIGNO", "CARCINOMA"]) else "NÃO"
-        )
-    else:
-        tabela["Alterado"] = "NOME DA COLUNA NÃO ENCONTRADO"
-        st.warning("Atenção: Não encontramos a coluna 'Resultado' no PDF. Verifique o layout do arquivo.")
-
-# --- FIM DA CORREÇÃO ---
         def destacar_alterados(linha):
-            cor = "background-color: #ffffb3; color: black" if linha["Alterado"] else ""
+            # CORREÇÃO: Valida se é True
+            cor = "background-color: #ffffb3; color: black" if linha.get("Alterado", False) else ""
             return [cor for _ in linha]
 
-        tabela["Coleta_Data"] = pd.to_datetime(tabela["Coleta"], errors="coerce")
-        tabela["Mês"] = tabela["Coleta_Data"].dt.strftime("%m/%Y")
+        if not tabela.empty:
+            tabela["Coleta_Data"] = pd.to_datetime(tabela["Coleta"], errors="coerce")
+            tabela["Mês"] = tabela["Coleta_Data"].dt.strftime("%m/%Y")
 
-        # FILTROS
-        st.sidebar.markdown("## 🔎 Filtros")
+            # FILTROS
+            st.sidebar.markdown("## 🔎 Filtros")
 
-        meses_disponiveis = sorted(tabela["Mês"].dropna().unique())
-        mes_selecionado = st.sidebar.selectbox("📅 Filtrar por Mês", ["Todos"] + list(meses_disponiveis))
+            meses_disponiveis = sorted(tabela["Mês"].dropna().unique())
+            mes_selecionado = st.sidebar.selectbox("📅 Filtrar por Mês", ["Todos"] + list(meses_disponiveis))
 
-        filtro_resultado = st.sidebar.selectbox(
-            "🧪 Filtrar por Resultado",
-            ["Todos", "Somente Alterados", "Somente Normais"]
-        )
+            filtro_resultado = st.sidebar.selectbox(
+                "🧪 Filtrar por Resultado",
+                ["Todos", "Somente Alterados", "Somente Normais"]
+            )
 
-        tabela_filtrada = tabela.copy()
+            tabela_filtrada = tabela.copy()
 
-        if mes_selecionado != "Todos":
-            tabela_filtrada = tabela_filtrada[tabela_filtrada["Mês"] == mes_selecionado]
+            if mes_selecionado != "Todos":
+                tabela_filtrada = tabela_filtrada[tabela_filtrada["Mês"] == mes_selecionado]
 
-        if filtro_resultado == "Somente Alterados":
-            tabela_filtrada = tabela_filtrada[tabela_filtrada["Alterado"] == True]
-        elif filtro_resultado == "Somente Normais":
-            tabela_filtrada = tabela_filtrada[tabela_filtrada["Alterado"] == False]
+            # CORREÇÃO: Agora o filtro Booleano funciona perfeitamente
+            if filtro_resultado == "Somente Alterados":
+                tabela_filtrada = tabela_filtrada[tabela_filtrada["Alterado"] == True]
+            elif filtro_resultado == "Somente Normais":
+                tabela_filtrada = tabela_filtrada[tabela_filtrada["Alterado"] == False]
 
-        total_alterados = tabela_filtrada["Alterado"].sum()
+            # CORREÇÃO: Como a coluna agora é booleana, .sum() conta os Trues corretamente
+            total_alterados = int(tabela_filtrada["Alterado"].sum())
 
-        if total_alterados > 0:
-            st.error(f"🚨 ATENÇÃO: {total_alterados} caso(s) alterado(s) identificado(s)!")
-        else:
-            st.success("✅ Nenhum caso alterado nos filtros aplicados.")
-
-        tabela_filtrada["Idade_Num"] = pd.to_numeric(tabela_filtrada["Idade"], errors="coerce")
-
-        na_faixa = len(tabela_filtrada[(tabela_filtrada["Idade_Num"] >= 25) & (tabela_filtrada["Idade_Num"] <= 64)])
-        fora_faixa = len(tabela_filtrada) - na_faixa
-
-        satisfatoria = len(
-            tabela_filtrada[tabela_filtrada["Amostra"].str.contains("SATISFAT", case=False, na=False)]
-        )
-
-        dois_epitelios = len(
-            tabela_filtrada[
-                tabela_filtrada["Epitélios"].str.contains("ESCAMOSO", case=False, na=False)
-                & tabela_filtrada["Epitélios"].str.contains("GLANDULAR", case=False, na=False)
-            ]
-        )
-
-        # ABAS
-        aba1, aba2 = st.tabs(["📊 Indicadores de Qualidade", "📋 Monitoramento de Pacientes"])
-
-        with aba1:
-            st.subheader("Parâmetros do Ministério da Saúde")
-            col1, col2, col3 = st.columns(3)
-            col1.metric("Na Faixa Etária (25-64)", na_faixa)
-            col2.metric("Fora da Faixa", fora_faixa)
-            col3.metric("Amostras Satisfatórias", satisfatoria)
-
-            st.markdown("---")
-            st.subheader("📊 Visualização Personalizada")
-
-            col_op1, col_op2 = st.columns(2)
-
-            with col_op1:
-                variavel = st.selectbox(
-                    "Escolha o indicador:",
-                    ["Microbiologia", "Representação de Epitélios"]
-                )
-
-            with col_op2:
-                tipo_grafico = st.selectbox(
-                    "Tipo de gráfico:",
-                    ["Barra", "Linha", "Pizza"]
-                )
-
-            if variavel == "Microbiologia":
-                dados_grafico = tabela_filtrada["Microbiologia"].value_counts()
+            if total_alterados > 0:
+                st.error(f"🚨 ATENÇÃO: {total_alterados} caso(s) alterado(s) identificado(s)!")
             else:
-                dados_grafico = pd.Series({
-                    "Ambos Presentes": dois_epitelios,
-                    "Faltando": len(tabela_filtrada) - dois_epitelios
-                })
+                st.success("✅ Nenhum caso alterado nos filtros aplicados.")
 
-            if tipo_grafico == "Barra":
-                st.bar_chart(dados_grafico)
-            elif tipo_grafico == "Linha":
-                st.line_chart(dados_grafico)
-            elif tipo_grafico == "Pizza":
-                fig, ax = plt.subplots()
-                ax.pie(dados_grafico, labels=dados_grafico.index, autopct="%1.1f%%")
-                ax.set_title(variavel)
-                st.pyplot(fig)
+            tabela_filtrada["Idade_Num"] = pd.to_numeric(tabela_filtrada["Idade"], errors="coerce")
 
-        with aba2:
-            st.write("### Tabela de Controle (Casos alterados em destaque)")
-            st.dataframe(
-                tabela_filtrada.style.apply(destacar_alterados, axis=1),
-                use_container_width=True
+            na_faixa = len(tabela_filtrada[(tabela_filtrada["Idade_Num"] >= 25) & (tabela_filtrada["Idade_Num"] <= 64)])
+            fora_faixa = len(tabela_filtrada) - na_faixa
+
+            satisfatoria = len(
+                tabela_filtrada[tabela_filtrada["Amostra"].astype(str).str.contains("SATISFAT", case=False, na=False)]
             )
 
-            st.markdown("---")
-            csv = tabela_filtrada.to_csv(index=False).encode('utf-8-sig')
-            st.download_button(
-                "📥 Baixar Planilha Conforme Filtro (.csv)",
-                csv,
-                "relatorio_filtrado.csv",
-                "text/csv"
+            dois_epitelios = len(
+                tabela_filtrada[
+                    tabela_filtrada["Epitélios"].astype(str).str.contains("ESCAMOSO", case=False, na=False)
+                    & tabela_filtrada["Epitélios"].astype(str).str.contains("GLANDULAR", case=False, na=False)
+                ]
             )
 
+            # ABAS
+            aba1, aba2 = st.tabs(["📊 Indicadores de Qualidade", "📋 Monitoramento de Pacientes"])
+
+            with aba1:
+                st.subheader("Parâmetros do Ministério da Saúde")
+                col1, col2, col3 = st.columns(3)
+                col1.metric("Na Faixa Etária (25-64)", na_faixa)
+                col2.metric("Fora da Faixa", fora_faixa)
+                col3.metric("Amostras Satisfatórias", satisfatoria)
+
+                st.markdown("---")
+                st.subheader("📊 Visualização Personalizada")
+
+                col_op1, col_op2 = st.columns(2)
+
+                with col_op1:
+                    variavel = st.selectbox(
+                        "Escolha o indicador:",
+                        ["Microbiologia", "Representação de Epitélios"]
+                    )
+
+                with col_op2:
+                    tipo_grafico = st.selectbox(
+                        "Tipo de gráfico:",
+                        ["Barra", "Linha", "Pizza"]
+                    )
+
+                if variavel == "Microbiologia":
+                    dados_grafico = tabela_filtrada["Microbiologia"].value_counts()
+                else:
+                    dados_grafico = pd.Series({
+                        "Ambos Presentes": dois_epitelios,
+                        "Faltando": len(tabela_filtrada) - dois_epitelios
+                    })
+
+                if tipo_grafico == "Barra":
+                    st.bar_chart(dados_grafico)
+                elif tipo_grafico == "Linha":
+                    st.line_chart(dados_grafico)
+                elif tipo_grafico == "Pizza":
+                    # CORREÇÃO: Utilizando a biblioteca importada
+                    fig, ax = plt.subplots()
+                    ax.pie(dados_grafico, labels=dados_grafico.index, autopct="%1.1f%%", colors=plt.cm.Pastel1.colors)
+                    ax.set_title(variavel)
+                    st.pyplot(fig)
+
+            with aba2:
+                st.write("### Tabela de Controle (Casos alterados em destaque)")
+                st.dataframe(
+                    tabela_filtrada.style.apply(destacar_alterados, axis=1),
+                    use_container_width=True
+                )
+
+                st.markdown("---")
+                csv = tabela_filtrada.to_csv(index=False).encode('utf-8-sig')
+                st.download_button(
+                    "📥 Baixar Planilha Conforme Filtro (.csv)",
+                    csv,
+                    "relatorio_filtrado.csv",
+                    "text/csv"
+                )
