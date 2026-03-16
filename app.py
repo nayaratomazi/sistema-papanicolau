@@ -131,19 +131,19 @@ else:
                 st.markdown("---")
                 c_g1, c_g2 = st.columns(2)
                 with c_g1:
-                st.write("### Microbiologia")
-            
-                contagem_micro = df_f["Microbiologia"].value_counts().sort_values()
-            
-                fig, ax = plt.subplots(figsize=(6,4))
-                contagem_micro.plot.barh(ax=ax)
-            
-                ax.set_xlabel("Quantidade")
-                ax.set_ylabel("Tipo")
-                ax.set_title("Distribuição da Microbiologia")
-            
-                for i, v in enumerate(contagem_micro):
-                    ax.text(v + 0.1, i, str(v), va='center')
+                    st.write("### Microbiologia")
+                
+                    contagem_micro = df_f["Microbiologia"].value_counts().sort_values()
+                
+                    fig, ax = plt.subplots(figsize=(6,4))
+                    contagem_micro.plot.barh(ax=ax)
+                
+                    ax.set_xlabel("Quantidade")
+                    ax.set_ylabel("Tipo")
+                    ax.set_title("Distribuição da Microbiologia")
+                
+                    for i, v in enumerate(contagem_micro):
+                        ax.text(v + 0.1, i, str(v), va='center')
             
                 st.pyplot(fig)
                 with c_g2:
