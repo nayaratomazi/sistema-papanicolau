@@ -11,278 +11,137 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- LIMPEZA DA INTERFACE (Correção de sintaxe CSS) ---
+# --- ESTILIZAÇÃO CSS (Centralizar senha e limpar UI) ---
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
-    [data-testid="stToolbar"] {visibility: hidden;}
+    .stApp { background-color: #f8f9fa; }
+    /* Estilo para centralizar o container da senha */
+    .auth-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        padding: 50px;
+        border-radius: 15px;
+        background: white;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. LOGO E CABEÇALHO
+# 2. LOGO E CABEÇALHO (Sempre visível)
 col_logo, col_titulo = st.columns([1, 5])
-
 with col_logo:
-    st.image(
-        "https://paineis-ext.mpdft.mp.br/extensions/mapasaude/logo-saude-da-familia.png",
-        width=100
-    )
-
+    st.image("https://paineis-ext.mpdft.mp.br/extensions/mapasaude/logo-saude-da-familia.png", width=100)
 with col_titulo:
     st.title("Gestão de Laudos de Citopatologia")
     st.markdown("##### *Painel de Monitoramento da Estratégia Saúde da Família*")
 
 st.markdown("---")
 
-# 3. ACESSO
+# 3. LÓGICA DE ACESSO CENTRALIZADA
 senha_correta = "esf2026"
-acesso = st.sidebar.text_input("🔐 Senha da Coordenação", type="password")
 
-if acesso == senha_correta:
-    st.sidebar.success("Acesso Liberado")
-    
+# Se não houver acesso na sessão, mostra o campo no meio
+if 'autenticado' not in st.session_state:
+    st.session_state['autenticado'] = False
+
+if not st.session_state['autenticado']:
+    _, col_central, _ = st.columns([1, 2, 1])
+    with col_central:
+        st.markdown('<div class="auth-container">', unsafe_allow_html=True)
+        st.subheader("🔐 Acesso Restrito")
+        senha_input = st.text_input("Digite a senha da coordenação para liberar o painel:", type="password")
+        if st.button("Entrar"):
+            if senha_input == senha_correta:
+                st.session_state['autenticado'] = True
+                st.rerun()
+            else:
+                st.error("Senha incorreta. Tente novamente.")
+        st.markdown('</div>', unsafe_allow_html=True)
+else:
+    # --- CONTEÚDO DO SISTEMA (SÓ APARECE APÓS A SENHA) ---
+    st.sidebar.success("✅ Acesso Autorizado")
+    if st.sidebar.button("Sair/Bloquear"):
+        st.session_state['autenticado'] = False
+        st.rerun()
+
     arquivos = st.file_uploader("📂 Carregar PDFs dos Laudos", type=["pdf"], accept_multiple_files=True)
 
     if arquivos:
         dados = []
+        with st.spinner('Processando laudos...'):
+            for arquivo in arquivos:
+                with pdfplumber.open(arquivo) as pdf:
+                    for pagina in pdf.pages:
+                        texto = pagina.extract_text()
+                        if not texto or "Idade:" not in texto:
+                            continue
 
-        for arquivo in arquivos:
-            with pdfplumber.open(arquivo) as pdf:
-                for pagina in pdf.pages:
-                    texto = pagina.extract_text()
-
-                    if not texto:
-                        continue
-
-                    if "Idade:" in texto:
-                        # Extração de campos baseada na sua lógica do VS Code
+                        # --- EXTRAÇÃO (Sua lógica do VS Code) ---
                         idade = texto.split("Idade:")[1].split()[0]
+                        coleta = texto.split("Data da coleta:")[1].split()[0] if "Data da coleta:" in texto else "N/A"
+                        unidade = texto.split("Nome:")[1].split("\n")[0] if "Nome:" in texto else "N/A"
+                        resultado = texto.split("CONCLUSÃO")[1][:200].strip() if "CONCLUSÃO" in texto else "N/A"
                         
-                        coleta = (
-                            texto.split("Data da coleta:")[1].split()[0]
-                            if "Data da coleta:" in texto
-                            else "N/A"
-                        )
+                        # Nascimento e Iniciais
+                        nasc = texto.upper().split("DATA DO NASCIMENTO")[1].replace(":", "").split()[0] if "DATA DO NASCIMENTO" in texto.upper() else "N/A"
+                        nome_cru = texto.split("Nome:")[2].split("\n")[0] if texto.count("Nome:") > 1 else ""
+                        iniciais = "".join([p[0].upper() for p in nome_cru.split() if p and p[0].isalpha() and p.lower() not in ['idade', 'data']])
 
-                        zt = (
-                            texto.split("TRANSFORMAÇÃO:")[1].split()[0]
-                            if "TRANSFORMAÇÃO:" in texto
-                            else "N/A"
-                        )
-
-                        resultado = (
-                            texto.split("CONCLUSÃO")[1][:200]
-                            if "CONCLUSÃO" in texto
-                            else "N/A"
-                        )
-
-                        nascimento = (
-                            texto.upper()
-                            .split("DATA DO NASCIMENTO")[1]
-                            .replace(":", "")
-                            .split()[0]
-                            if "DATA DO NASCIMENTO" in texto.upper()
-                            else "N/A"
-                        )
-
-                        unidade = (
-                            texto.split("Nome:")[1].split("\n")[0]
-                            if "Nome:" in texto
-                            else "N/A"
-                        )
-
-                        amostra = (
-                            texto.split("AMOSTRA")[1].split("\n")[0][:50]
-                            if "AMOSTRA" in texto
-                            else "N/A"
-                        )
-
-                        nome_cru = (
-                            texto.split("Nome:")[2].split("\n")[0]
-                            if texto.count("Nome:") > 1
-                            else ""
-                        )
-
-                        nome_limpo = (
-                            nome_cru.split("Idade")[0]
-                            .split("Data")[0]
-                            .split("Nasc")[0]
-                        )
-
-                        iniciais = (
-                            "".join([p[0].upper() for p in nome_limpo.split() if p and p[0].isalpha()])
-                            if nome_limpo
-                            else "N/A"
-                        )
-
-                        endereco = (
-                            texto.split("Endereço:")[1].split("\n")[0][:40]
-                            if "Endereço:" in texto
-                            else "N/A"
-                        )
-
-                        epitelios = (
-                            texto.upper()
-                            .split("EPITÉLIOS REPRESENTADOS NA AMOSTRA")[1]
-                            .split("\n")[0]
-                            .replace(":", "")
-                            .strip()
-                            if "EPITÉLIOS REPRESENTADOS NA AMOSTRA" in texto.upper()
-                            else "N/A"
-                        )
-
-                        microbiologia = (
-                            texto.upper()
-                            .split("MICROBIOLOGIA")[1]
-                            .split("\n")[0]
-                            .replace(":", "")
-                            .strip()
-                            if "MICROBIOLOGIA" in texto.upper()
-                            else "N/A"
-                        )
-
-                        alteracoes = (
-                            texto.upper()
-                            .split("ALTERAÇÕES CELULARES BENIGNAS")[1]
-                            .split("\n")[0]
-                            .replace(":", "")
-                            .strip()
-                            if "ALTERAÇÕES CELULARES BENIGNAS" in texto.upper()
-                            else "N/A"
-                        )
+                        # Microbiologia e Epitélios
+                        microbio = texto.upper().split("MICROBIOLOGIA")[1].split("\n")[0].replace(":", "").strip() if "MICROBIOLOGIA" in texto.upper() else "N/A"
+                        epitelio = texto.upper().split("EPITÉLIOS REPRESENTADOS NA AMOSTRA")[1].split("\n")[0].replace(":", "").strip() if "EPITÉLIOS REPRESENTADOS NA AMOSTRA" in texto.upper() else "N/A"
+                        amostra = texto.split("AMOSTRA")[1].split("\n")[0][:50] if "AMOSTRA" in texto else "N/A"
 
                         dados.append({
-                            "Unidade": unidade,
-                            "Iniciais": iniciais,
-                            "Nascimento": nascimento,
-                            "Idade": idade,
-                            "Coleta": coleta,
-                            "Endereço": endereco,
-                            "Amostra": amostra,
-                            "Epitélios": epitelios,
-                            "ZT": zt,
-                            "Microbiologia": microbiologia,
-                            "Alterações": alteracoes,
-                            "Resultado": resultado,
+                            "Unidade": unidade, "Iniciais": iniciais, "Nascimento": nasc,
+                            "Idade": idade, "Coleta": coleta, "Amostra": amostra,
+                            "Epitélios": epitelio, "Microbiologia": microbio, "Resultado": resultado
                         })
 
         if dados:
-            tabela = pd.DataFrame(dados)
-
-            # Lógica de identificação de resultados alterados
-            termos_alerta = ["ASC-US", "ASC-H", "BAIXO GRAU", "ALTO GRAU", "REPETIR", "LESÃO", "ATIPIAS", "CARCINOMA", "NIC"]
-            tabela["Alterado"] = tabela["Resultado"].astype(str).str.upper().apply(
-                lambda x: any(t in x for t in termos_alerta)
-            )
-
-            # Formatação de datas
-            tabela["Coleta_Data"] = pd.to_datetime(tabela["Coleta"], errors="coerce")
-            tabela["Mês"] = tabela["Coleta_Data"].dt.strftime("%m/%Y")
-
-            # --- FILTROS NO SIDEBAR ---
-            st.sidebar.markdown("## 🔎 Filtros")
-            meses_disponiveis = sorted(tabela["Mês"].dropna().unique())
-            mes_selecionado = st.sidebar.selectbox("📅 Filtrar por Mês", ["Todos"] + list(meses_disponiveis))
-
-            filtro_resultado = st.sidebar.selectbox(
-                "🧪 Filtrar por Resultado",
-                ["Todos", "Somente Alterados", "Somente Normais"]
-            )
-
-            tabela_filtrada = tabela.copy()
-
-            if mes_selecionado != "Todos":
-                tabela_filtrada = tabela_filtrada[tabela_filtrada["Mês"] == mes_selecionado]
-
-            if filtro_resultado == "Somente Alterados":
-                tabela_filtrada = tabela_filtrada[tabela_filtrada["Alterado"] == True]
-            elif filtro_resultado == "Somente Normais":
-                tabela_filtrada = tabela_filtrada[tabela_filtrada["Alterado"] == False]
-
-            # --- ALERTAS E MÉTRICAS ---
-            total_alterados = int(tabela_filtrada["Alterado"].sum())
-            if total_alterados > 0:
-                st.error(f"🚨 ATENÇÃO: {total_alterados} caso(s) alterado(s) identificado(s)!")
-            else:
-                st.success("✅ Nenhum caso alterado nos filtros aplicados.")
-
-            # Indicadores de Qualidade
-            tabela_filtrada["Idade_Num"] = pd.to_numeric(tabela_filtrada["Idade"], errors="coerce")
-            na_faixa = len(tabela_filtrada[(tabela_filtrada["Idade_Num"] >= 25) & (tabela_filtrada["Idade_Num"] <= 64)])
-            fora_faixa = len(tabela_filtrada) - na_faixa
-            satisfatoria = len(tabela_filtrada[tabela_filtrada["Amostra"].str.contains("SATISFAT", case=False, na=False)])
+            df = pd.DataFrame(dados)
+            df["Idade_Num"] = pd.to_numeric(df["Idade"], errors="coerce")
             
-            dois_epitelios = len(
-                tabela_filtrada[
-                    tabela_filtrada["Epitélios"].str.contains("ESCAMOSO", case=False, na=False)
-                    & tabela_filtrada["Epitélios"].str.contains("GLANDULAR", case=False, na=False)
-                ]
-            )
+            # Filtro de Alterados
+            termos = ["ASC-US", "ASC-H", "BAIXO GRAU", "ALTO GRAU", "REPETIR", "LESÃO", "ATIPIAS", "CARCINOMA", "NIC"]
+            df["Alterado"] = df["Resultado"].str.upper().apply(lambda x: any(t in str(x) for t in termos))
 
-            # --- INTERFACE POR ABAS ---
-            aba1, aba2 = st.tabs(["📊 Indicadores de Qualidade", "📋 Monitoramento de Pacientes"])
+            # --- FILTROS LATERAIS ---
+            st.sidebar.header("🔎 Filtros")
+            f_status = st.sidebar.selectbox("Filtrar Resultado", ["Todos", "Somente Alterados", "Somente Normais"])
+            
+            df_f = df.copy()
+            if f_status == "Somente Alterados": df_f = df_f[df_f["Alterado"]]
+            elif f_status == "Somente Normais": df_f = df_f[~df_f["Alterado"]]
+
+            # --- EXIBIÇÃO ---
+            aba1, aba2 = st.tabs(["📊 Indicadores", "📋 Tabela de Monitoramento"])
 
             with aba1:
-                st.subheader("Parâmetros do Ministério da Saúde")
-                col1, col2, col3 = st.columns(3)
-                col1.metric("Na Faixa Etária (25-64)", na_faixa)
-                col2.metric("Fora da Faixa", fora_faixa)
-                col3.metric("Amostras Satisfatórias", satisfatoria)
-
+                col_m1, col_m2, col_m3 = st.columns(3)
+                col_m1.metric("Total de Laudos", len(df_f))
+                col_m2.metric("Na Faixa (25-64)", len(df_f[(df_f["Idade_Num"]>=25) & (df_f["Idade_Num"]<=64)]))
+                col_m3.metric("Alterações", int(df_f["Alterado"].sum()))
+                
                 st.markdown("---")
-                st.subheader("📊 Visualização Personalizada")
-                col_op1, col_op2 = st.columns(2)
-
-                with col_op1:
-                    variavel = st.selectbox("Escolha o indicador:", ["Microbiologia", "Representação de Epitélios"])
-                with col_op2:
-                    tipo_grafico = st.selectbox("Tipo de gráfico:", ["Barra", "Linha", "Pizza"])
-
-                if variavel == "Microbiologia":
-                    dados_grafico = tabela_filtrada["Microbiologia"].value_counts()
-                else:
-                    dados_grafico = pd.Series({
-                        "Ambos Presentes": dois_epitelios,
-                        "Faltando": len(tabela_filtrada) - dois_epitelios
-                    })
-
-                if tipo_grafico == "Barra":
-                    st.bar_chart(dados_grafico)
-                elif tipo_grafico == "Linha":
-                    st.line_chart(dados_grafico)
-                elif tipo_grafico == "Pizza":
+                c_g1, c_g2 = st.columns(2)
+                with c_g1:
+                    st.write("### Microbiologia")
                     fig, ax = plt.subplots()
-                    ax.pie(dados_grafico, labels=dados_grafico.index, autopct="%1.1f%%", startangle=90)
-                    ax.set_title(variavel)
+                    df_f["Microbiologia"].value_counts().plot.pie(autopct='%1.1f%%', ax=ax)
                     st.pyplot(fig)
+                with c_g2:
+                    st.write("### Epitélios")
+                    st.bar_chart(df_f["Epitélios"].value_counts())
 
             with aba2:
-                st.write("### Tabela de Controle (Casos alterados em destaque)")
-                
-                # Função para destacar linhas alteradas
-                def destacar_alterados(linha):
-                    cor = "background-color: #ffffb3; color: black" if linha["Alterado"] else ""
-                    return [cor for _ in linha]
-
-                st.dataframe(
-                    tabela_filtrada.style.apply(destacar_alterados, axis=1),
-                    use_container_width=True
-                )
-
-                st.markdown("---")
-                csv = tabela_filtrada.to_csv(index=False).encode('utf-8-sig')
-                st.download_button(
-                    "📥 Baixar Planilha Conforme Filtro (.csv)",
-                    csv,
-                    "relatorio_filtrado.csv",
-                    "text/csv"
-                )
+                st.dataframe(df_f.style.apply(lambda x: ['background-color: #ffcccc' if x.Alterado else '' for _ in x], axis=1))
+                csv = df_f.to_csv(index=False).encode('utf-8-sig')
+                st.download_button("📥 Baixar Dados (CSV)", csv, "relatorio.csv", "text/csv")
         else:
-            st.info("Nenhum dado compatível encontrado nos PDFs carregados.")
-
-elif acesso != "" and acesso != senha_correta:
-    st.sidebar.error("Senha Incorreta")
-else:
-    st.info("💡 Por favor, insira a senha na barra lateral para acessar o sistema.")
+            st.info("Aguardando upload de arquivos...")
