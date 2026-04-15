@@ -107,8 +107,8 @@ else:
             df = pd.DataFrame(dados)
             df["Idade_Num"] = pd.to_numeric(df["Idade"], errors="coerce")
             
-            # Filtro de Alterados
-            termos = ["ASC-US", "ASC-H", "BAIXO GRAU", "ALTO GRAU", "REPETIR", "LESÃO", "ATIPIAS", "CARCINOMA", "NIC"]
+            # Filtro de Alterados (Adicionado o novo termo aqui)
+            termos = ["ASC-US", "ASC-H", "BAIXO GRAU", "ALTO GRAU", "REPETIR", "LESÃO", "ATIPIAS", "CARCINOMA", "NIC", "CÉLULAS ATÍPICAS DE SIGNIFICADO INDETERMINADO"]
             df["Alterado"] = df["Resultado"].str.upper().apply(lambda x: any(t in str(x) for t in termos))
 
             # --- FILTROS LATERAIS ---
